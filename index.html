@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini E‑commerce — Agus</title>
+  <meta name="description" content="Mini tienda con carrito en LocalStorage, filtros por categoría/precio y búsqueda. 100% HTML + CSS + JS sin backend." />
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b1220; --card:#0f172a; --text:#e2e8f0; --muted:#94a3b8;
+      --brand:#0ea5e9; --brand-strong:#0284c7; --ring:rgba(14,165,233,.45);
+      --ok:#22c55e; --bad:#ef4444; --shadow:0 12px 30px rgba(2, 8, 23, .25);
+    }
+    :root.light{ --bg:#f8fafc; --card:#ffffff; --text:#0f172a; --muted:#475569; --shadow:0 10px 24px rgba(2,8,23,.08)}
+    *{box-sizing:border-box}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text)}
+    a{color:var(--brand); text-decoration:none}
+    .container{width:min(1120px,92%); margin-inline:auto}
+    header{position:sticky; top:0; z-index:40; backdrop-filter:saturate(160%) blur(8px); background:color-mix(in srgb, var(--bg), transparent 35%); border-bottom:1px solid color-mix(in srgb, var(--text), transparent 90%)}
+    .nav{display:flex; align-items:center; justify-content:space-between; padding:14px 0}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:800}
+    .logo{inline-size:36px; block-size:36px; border-radius:10px; background:linear-gradient(135deg, var(--brand), #22d3ee)}
+    .actions{display:flex; align-items:center; gap:10px}
+    .btn{display:inline-flex; align-items:center; gap:.5rem; background:var(--brand); color:#fff; border:none; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:700; box-shadow:var(--shadow)}
+    .btn:hover{background:var(--brand-strong)}
+    .btn.ghost{background:transparent; color:var(--text); border:1px solid color-mix(in srgb, var(--text), transparent 80%)}
+
+    .hero{padding:48px 0 16px; display:grid; grid-template-columns:1.2fr .8fr; gap:24px; align-items:center}
+    .lead{color:var(--muted)}
+    .hero-card{background:var(--card); border:1px solid color-mix(in srgb, var(--text), transparent 88%); padding:16px; border-radius:16px}
+    .hero-card img{width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:12px}
+
+    .filters{margin:18px 0; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:10px}
+    .filters input, .filters select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid color-mix(in srgb, var(--text), transparent 85%); background:color-mix(in srgb, var(--bg), white 6%); color:var(--text)}
+    .filters label{font-size:.85rem; color:var(--muted); display:block; margin-bottom:6px}
+
+    .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+    .card{background:var(--card); border:1px solid color-mix(in srgb, var(--text), transparent 88%); border-radius:16px; overflow:hidden; display:flex; flex-direction:column}
+    .card img{width:100%; aspect-ratio:16/11; object-fit:cover}
+    .card .body{padding:14px}
+    .price{font-weight:800}
+    .muted{color:var(--muted)}
+
+    /* Cart drawer */
+    .drawer{position:fixed; inset:0 0 0 auto; width:min(420px, 92%); background:var(--card); border-left:1px solid color-mix(in srgb, var(--text), transparent 85%); transform:translateX(110%); transition:.35s ease; z-index:60; display:flex; flex-direction:column}
+    .drawer.open{transform:none}
+    .drawer header{position:sticky; top:0; background:transparent; border:none}
+    .drawer h2{margin:0}
+    .drawer .items{padding:12px; display:grid; gap:12px; overflow:auto}
+    .cart-item{display:grid; grid-template-columns:64px 1fr auto; gap:12px; align-items:center; background:color-mix(in srgb, var(--card), transparent 6%); border:1px solid color-mix(in srgb, var(--text), transparent 90%); border-radius:12px; padding:8px}
+    .qty{display:inline-flex; align-items:center; gap:6px}
+    .qty button{inline-size:28px; block-size:28px; border-radius:8px; border:1px solid color-mix(in srgb, var(--text), transparent 85%); background:transparent; color:var(--text); cursor:pointer}
+    .drawer footer{margin-top:auto; padding:14px; border-top:1px solid color-mix(in srgb, var(--text), transparent 88%)}
+
+    .toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 14px; border-radius:999px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.3s}
+    .toast.show{opacity:1}
+
+    footer{border-top:1px solid color-mix(in srgb, var(--text), transparent 90%); margin-top:28px; padding:18px 0; color:var(--muted)}
+
+    @media (max-width:980px){
+      .hero{grid-template-columns:1fr}
+      .grid{grid-template-columns:1fr 1fr}
+      .filters{grid-template-columns:1fr 1fr 1fr 1fr}
+    }
+    @media (max-width:640px){
+      .grid{grid-template-columns:1fr}
+      .filters{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <header>
+    <div class="container nav">
+      <div class="brand"><span class="logo" aria-hidden="true"></span> Mini E‑commerce — Agus</div>
+      <div class="actions">
+        <button id="theme" class="btn ghost" aria-label="Cambiar tema">🌙</button>
+        <button id="openCart" class="btn" aria-haspopup="dialog" aria-controls="carrito">🛒 <span id="count">0</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1 style="letter-spacing:-.02em">Tienda minimalista, <span style="color:var(--brand)">carrito real</span>.</h1>
+        <p class="lead">Demo 100% front‑end con LocalStorage. Búsqueda, filtros por categoría y precio. Sin backend ni frameworks.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <a class="btn" href="#catalogo">Ver catálogo</a>
+          <a class="btn ghost" href="https://github.com/Agustinalt102" target="_blank" rel="noopener">Ver código</a>
+        </div>
+      </div>
+      <aside class="hero-card" aria-label="Muestra">
+        <img alt="Interfaz de tienda con tarjetas de producto y carrito lateral" src="https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1600&auto=format&fit=crop" />
+      </aside>
+    </section>
+
+    <!-- Filtros -->
+    <section id="catalogo" aria-labelledby="filtros-title">
+      <h2 id="filtros-title" class="sr-only">Filtros y búsqueda</h2>
+      <div class="filters">
+        <div>
+          <label for="q">Buscar</label>
+          <input id="q" placeholder="Nombre o descripción" />
+        </div>
+        <div>
+          <label for="cat">Categoría</label>
+          <select id="cat">
+            <option value="">Todas</option>
+            <option>Accesorios</option>
+            <option>Indumentaria</option>
+            <option>Electrónica</option>
+          </select>
+        </div>
+        <div>
+          <label for="max">Precio máximo ($)</label>
+          <input id="max" type="number" min="0" step="100" placeholder="Sin tope" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="clear" class="btn ghost" type="button">Limpiar filtros</button>
+        </div>
+      </div>
+
+      <!-- Productos -->
+      <div id="list" class="grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- Drawer Carrito -->
+  <aside id="carrito" class="drawer" role="dialog" aria-label="Carrito de compras" aria-modal="true" aria-hidden="true">
+    <header class="container nav">
+      <h2>Tu carrito</h2>
+      <div class="actions">
+        <button id="clearCart" class="btn ghost" type="button">Vaciar</button>
+        <button id="closeCart" class="btn ghost" aria-label="Cerrar carrito">✕</button>
+      </div>
+    </header>
+    <div class="items" id="cartItems"></div>
+    <footer>
+      <div class="container" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap">
+        <strong>Total: $ <span id="total">0</span></strong>
+        <button id="checkout" class="btn">Finalizar compra</button>
+      </div>
+    </footer>
+  </aside>
+
+  <footer>
+    <div class="container" style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap">
+      <p>© <span id="year"></span> Agus — Mini E‑commerce demo.</p>
+      <p class="muted">HTML + CSS + JS puro • LocalStorage • Accesible</p>
+    </div>
+  </footer>
+
+  <script>
+    // --- Datos de productos (demo)
+    const PRODUCTS = [
+      {id:1, name:'Auriculares Quantum X', price:15999, cat:'Electrónica', img:'https://images.unsplash.com/photo-1518443952249-7e62bc2e6f61?q=80&w=1600&auto=format&fit=crop', desc:'Sonido envolvente, 40mm, mic desmontable.'},
+      {id:2, name:'Remera Basic Oversize', price:8999, cat:'Indumentaria', img:'https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600&auto=format&fit=crop', desc:'Algodón 100%, unisex, varias talles.'},
+      {id:3, name:'Gorra Classic Dad', price:6990, cat:'Accesorios', img:'https://images.unsplash.com/photo-1503342452485-86ff0a2e7a86?q=80&w=1600&auto=format&fit=crop', desc:'Ajustable, liviana, 3 colores.'},
+      {id:4, name:'Teclado Mecánico RGB', price:32999, cat:'Electrónica', img:'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1600&auto=format&fit=crop', desc:'Switches blue, anti‑ghosting, 87 teclas.'},
+      {id:5, name:'Buzo Hoodie Warm', price:18999, cat:'Indumentaria', img:'https://images.unsplash.com/photo-1618354691221-c0f8f0b3064f?q=80&w=1600&auto=format&fit=crop', desc:'Abrigado, capucha doble, bolsillos.'},
+      {id:6, name:'Mochila Urban 20L', price:21999, cat:'Accesorios', img:'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop', desc:'Compartimento notebook, repelente al agua.'},
+      {id:7, name:'Mouse Gamer Lite', price:12999, cat:'Electrónica', img:'https://images.unsplash.com/photo-1588345921523-c2d60f1177fc?q=80&w=1600&auto=format&fit=crop', desc:'8000 DPI, 6 botones programables.'},
+      {id:8, name:'Jogger Street Fit', price:14999, cat:'Indumentaria', img:'https://images.unsplash.com/photo-1548883354-94bcfe321cbb?q=80&w=1600&auto=format&fit=crop', desc:'Calce cómodo, bolsillos profundos.'},
+      {id:9, name:'Lentes Sun Polar', price:9990, cat:'Accesorios', img:'https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=1600&auto=format&fit=crop', desc:'Polarizados UV400, marco liviano.'}
+    ];
+
+    // --- Utilidades DOM
+    const $ = (q,root=document) => root.querySelector(q);
+    const $$ = (q,root=document) => [...root.querySelectorAll(q)];
+
+    // --- Tema persistente
+    const root = document.documentElement; const THEME_KEY='mini-shop-theme';
+    const applyTheme = m=>{ m==='light'?root.classList.add('light'):root.classList.remove('light'); $('#theme').textContent = m==='light'?'🌞':'🌙'; };
+    applyTheme(localStorage.getItem(THEME_KEY) || (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+    $('#theme').addEventListener('click',()=>{const next=root.classList.contains('light')?'dark':'light'; localStorage.setItem(THEME_KEY,next); applyTheme(next)});
+
+    // --- Render catálogo
+    const listEl = $('#list');
+    function productCard(p){
+      const el = document.createElement('article'); el.className='card';
+      el.innerHTML = `
+        <img alt="${p.name}" src="${p.img}" loading="lazy" />
+        <div class="body">
+          <h3 style="margin:.2rem 0 .3rem">${p.name}</h3>
+          <p class="muted" style="min-height:42px">${p.desc}</p>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px">
+            <span class="price">$ ${p.price.toLocaleString('es-AR')}</span>
+            <button class="btn" data-add="${p.id}">Agregar</button>
+          </div>
+        </div>`;
+      return el;
+    }
+
+    function render(products){
+      listEl.innerHTML='';
+      if(!products.length){ listEl.innerHTML = `<p class="muted">No se encontraron productos con esos filtros.</p>`; return; }
+      const frag = document.createDocumentFragment();
+      products.forEach(p=>frag.appendChild(productCard(p)));
+      listEl.appendChild(frag);
+    }
+
+    // --- Filtros
+    const state = { q:'', cat:'', max:'' };
+    function applyFilters(){
+      const q = state.q.trim().toLowerCase();
+      const cat = state.cat; const max = Number(state.max)||Infinity;
+      const out = PRODUCTS.filter(p=>
+        (!cat || p.cat===cat) && p.price<=max &&
+        (p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q))
+      );
+      render(out);
+    }
+
+    $('#q').addEventListener('input', e=>{ state.q = e.target.value; applyFilters(); });
+    $('#cat').addEventListener('change', e=>{ state.cat = e.target.value; applyFilters(); });
+    $('#max').addEventListener('input', e=>{ state.max = e.target.value; applyFilters(); });
+    $('#clear').addEventListener('click', ()=>{ state.q=''; state.cat=''; state.max=''; $('#q').value=''; $('#cat').value=''; $('#max').value=''; applyFilters(); });
+
+    // --- Carrito con LocalStorage
+    const CART_KEY='agus-cart';
+    const cart = {
+      items: JSON.parse(localStorage.getItem(CART_KEY)||'[]'),
+      save(){ localStorage.setItem(CART_KEY, JSON.stringify(this.items)); updateBadge(); },
+      add(id){ const it=this.items.find(i=>i.id===id); it?it.qty++:this.items.push({id, qty:1}); this.save(); toast('Producto agregado'); },
+      inc(id){ const it=this.items.find(i=>i.id===id); if(it){ it.qty++; this.save(); } },
+      dec(id){ const it=this.items.find(i=>i.id===id); if(it){ it.qty--; if(it.qty<=0) this.remove(id); else this.save(); } },
+      remove(id){ this.items = this.items.filter(i=>i.id!==id); this.save(); },
+      clear(){ this.items = []; this.save(); },
+      total(){ return this.items.reduce((acc,i)=> acc + PRODUCTS.find(p=>p.id===i.id).price * i.qty, 0); },
+    };
+
+    function updateBadge(){ $('#count').textContent = cart.items.reduce((a,i)=>a+i.qty,0); }
+
+    function renderCart(){
+      const wrap = $('#cartItems'); wrap.innerHTML='';
+      if(!cart.items.length){ wrap.innerHTML = `<p class="muted">Tu carrito está vacío.</p>`; $('#total').textContent='0'; return; }
+      const frag = document.createDocumentFragment();
+      cart.items.forEach(i=>{
+        const p = PRODUCTS.find(p=>p.id===i.id);
+        const row = document.createElement('div'); row.className='cart-item';
+        row.innerHTML = `
+          <img alt="${p.name}" src="${p.img}" />
+          <div>
+            <strong>${p.name}</strong>
+            <p class="muted">$ ${p.price.toLocaleString('es-AR')}</p>
+            <div class="qty" role="group" aria-label="Cantidad">
+              <button data-dec="${p.id}" aria-label="Quitar uno">−</button>
+              <span>${i.qty}</span>
+              <button data-inc="${p.id}" aria-label="Agregar uno">+</button>
+            </div>
+          </div>
+          <div style="display:grid; gap:8px; justify-items:end">
+            <button class="btn ghost" data-remove="${p.id}">Quitar</button>
+            <strong>$ ${(p.price*i.qty).toLocaleString('es-AR')}</strong>
+          </div>`;
+        frag.appendChild(row);
+      });
+      wrap.appendChild(frag);
+      $('#total').textContent = cart.total().toLocaleString('es-AR');
+    }
+
+    // Eventos catálogo (delegación)
+    listEl.addEventListener('click', e=>{
+      const id = Number(e.target.getAttribute('data-add'));
+      if(id){ cart.add(id); }
+    });
+
+    // Eventos carrito
+    $('#cartItems').addEventListener('click', e=>{
+      const inc = e.target.getAttribute('data-inc');
+      const dec = e.target.getAttribute('data-dec');
+      const rem = e.target.getAttribute('data-remove');
+      if(inc){ cart.inc(Number(inc)); renderCart(); }
+      if(dec){ cart.dec(Number(dec)); renderCart(); }
+      if(rem){ cart.remove(Number(rem)); renderCart(); }
+    });
+
+    // Drawer open/close
+    const drawer = $('#carrito');
+    const openCart = ()=>{ drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false'); renderCart(); };
+    const closeCart = ()=>{ drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); };
+    $('#openCart').addEventListener('click', openCart);
+    $('#closeCart').addEventListener('click', closeCart);
+
+    // Acciones footer del carrito
+    $('#clearCart').addEventListener('click', ()=>{ cart.clear(); renderCart(); });
+    $('#checkout').addEventListener('click', ()=>{
+      if(!cart.items.length){ toast('Tu carrito está vacío'); return; }
+      cart.clear(); renderCart(); closeCart(); toast('¡Compra simulada! Gracias por probar 🤝');
+    });
+
+    // Toast minimal
+    const toastEl = $('#toast'); let toastTO;
+    function toast(msg){ clearTimeout(toastTO); toastEl.textContent = msg; toastEl.classList.add('show'); toastTO=setTimeout(()=>toastEl.classList.remove('show'), 1600); }
+
+    // Inicial
+    document.getElementById('year').textContent = new Date().getFullYear();
+    updateBadge();
+    applyFilters();
+  </script>
+</body>
+</html>
